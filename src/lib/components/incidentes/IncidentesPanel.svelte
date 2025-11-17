@@ -6,7 +6,7 @@
   } from 'lucide-svelte';
  
   import { onMount } from 'svelte';
-  import { obtenerIncidentes, obtenerIncidente, actualizarIncidente, mapToUI, crearIncidente } from "$lib/services/incidenteService";
+  import { obtenerIncidentes, obtenerIncidente, actualizarIncidente, mapToUI, crearIncidente, cerrarIncidente } from "$lib/services/incidenteService";
   import type { IncidenteUI, IncidenteAPI, IncidenteCrear } from "$lib/types/incidentes";
 
   let casos: IncidenteUI[] = [];
@@ -144,7 +144,6 @@
 
   // --- Otros modales ---
   let showModalDerivar = false;
-  let showModalCerrar = false;
   let showModalAtender = false;
 
 
@@ -202,8 +201,43 @@
 
   function abrirModalDerivar() { showModalDerivar = true; }
   function cerrarModalDerivar() { showModalDerivar = false; }
-  function abrirModalCerrar() { showModalCerrar = true; }
-  function cerrarModalCerrar() { showModalCerrar = false; }
+
+
+  let showModalCerrar = false;
+  let casoCerrar: IncidenteUI | null = null;
+  let observacionCierre = '';  // opcional
+
+  function abrirModalCerrar(caso: IncidenteUI) {
+    casoCerrar = caso;
+    observacionCierre = '';
+    showModalCerrar = true;
+  }
+
+  function cerrarModalCerrar() {
+    showModalCerrar = false;
+    casoCerrar = null;
+    observacionCierre = '';
+  }
+
+  async function confirmarCierre() {
+    if (!casoCerrar) return;
+
+    try {
+      const id = parseInt(casoCerrar.id.replace('INC-', ''));
+      const actualizado = await cerrarIncidente(id);
+
+      // Actualizar lista
+      casos = casos.map(c => 
+        c.id === casoCerrar!.id ? mapToUI(actualizado) : c
+      );
+
+      alert("Caso cerrado correctamente");
+      cerrarModalCerrar();
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Error al cerrar el caso");
+    }
+  }
 
 
   let casoAtender: IncidenteUI | null = null;
@@ -261,6 +295,7 @@
 
     try {
       const respuesta = await crearIncidente(payload);
+      casos = [mapToUI(respuesta), ...casos];
       console.log("BACKEND RESPONDIÓ → ", respuesta);
       alert("Incidente registrado correctamente.");
     } catch (error) {
@@ -391,7 +426,10 @@
           <button on:click={abrirModalDerivar} class="flex items-center gap-2 px-3 py-2 text-sm border border-purple-400 rounded-lg text-gray-700 hover:bg-purple-50 transition">
             <Forward size={16} /> Derivar
           </button>
-          <button on:click={abrirModalCerrar} class="flex items-center gap-2 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-600 hover:bg-gray-100 transition">
+          <button 
+            on:click={() => abrirModalCerrar(caso)}
+            class="flex items-center gap-2 px-3 py-2 text-sm border border-red-400 rounded-lg text-red-700 hover:bg-red-50 transition"
+          >
             <CheckCircle size={16} /> Cerrar Caso
           </button>
         </div>
@@ -716,50 +754,40 @@
 {/if}
 
 
-{#if showModalCerrar}
-  <div class="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center p-6 pb-2">
-        <h2 class="text-xl font-bold text-gray-800">Cerrar Caso</h2>
-        <button on:click={cerrarModalCerrar} class="text-gray-400 hover:text-gray-600">
-          <X size={20} />
-        </button>
+{#if showModalCerrar && casoCerrar}
+<div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl w-full max-w-md p-6 shadow-xl">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-red-700">Cerrar Caso</h2>
+      <button on:click={cerrarModalCerrar}><X size={22} /></button>
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-red-50 p-4 rounded-lg">
+        <p class="text-sm font-medium">Caso: {casoCerrar.id}</p>
+        <p class="text-sm">{casoCerrar.estudiantes.join(', ')}</p>
       </div>
 
-      <div class="p-6 space-y-5 py-2">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">¿Estas seguro de que quieres cerrar el caso?</label>
-        </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Observación final (opcional)</label>
+        <textarea 
+          bind:value={observacionCierre}
+          rows="3"
+          class="w-full border rounded-lg p-2 text-sm"
+          placeholder="Motivo del cierre..."
+        ></textarea>
       </div>
 
-      <div class="p-6 space-y-5 pt-2 pb-2">
-        <!-- Observacion -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Observacion final</label>
-          <textarea
-            bind:value={descripcion}
-            placeholder="Se cierra el caso por..."
-            rows="4"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
-          />
-        </div>
-      </div>
-
-      <!-- Botones del modal -->
-      <div class="flex justify-end gap-3 p-6 bg-gray-50 rounded-b-xl">
-        <button
-          on:click={cerrarModal}
-          class="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition"
-        >
-          Cancelar
-        </button>
-        <button
-          on:click={registrar}
-          class="px-5 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium"
+      <div class="flex justify-end gap-3">
+        <button on:click={cerrarModalCerrar} class="px-4 py-2 border rounded-lg">Cancelar</button>
+        <button 
+          on:click={confirmarCierre}
+          class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
         >
           Cerrar Caso
         </button>
       </div>
     </div>
   </div>
+</div>
 {/if}

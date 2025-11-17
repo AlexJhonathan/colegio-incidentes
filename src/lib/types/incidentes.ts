@@ -32,7 +32,7 @@ export interface IncidenteAPI {
   antecedentes: string | null;
   acciones_tomadas: string | null;
   seguimiento: string | null;
-  estado: 'provisional' | 'derivado' | 'cerrado';
+  estado: 'abierto' | 'derivado' | 'cerrado';
   estudiantes: EstudianteRead[];
   adjuntos: AdjuntoRead[];
   situaciones: SituacionRead[];  // ← NUEVO

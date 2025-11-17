@@ -47,15 +47,45 @@ export async function actualizarIncidente(id: number, data: Partial<IncidenteCre
   return await res.json();
 }
 
+
+export async function cerrarIncidente(id: number, modificador_id: number = 1): Promise<IncidenteAPI> {
+  const payload = {
+    estado: "cerrado"
+  };
+
+  const res = await fetch(`${API}/incidentes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || "Error al cerrar el incidente");
+  }
+
+  return await res.json();
+}
+
+
+const estadoMap: Record<string, 'Abierto' | 'En Seguimiento' | 'Cerrado' | 'Derivado'> = {
+  abierto: 'Abierto',
+  derivado: 'Derivado',
+  cerrado: 'Cerrado'
+};
+
 /* Opcional: función que convierte API → UI */
 export function mapToUI(inc: IncidenteAPI): IncidenteUI {
+
+  const estadoUI = estadoMap[inc.estado] || 'En Seguimiento';
+
   return {
     id: `INC-${inc.id_incidente.toString().padStart(3, '0')}`,
     estudiantes: inc.estudiantes.map(e =>
       `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno}`
     ),
     descripcion: inc.antecedentes || 'Sin descripción',
-    estado: 'En Seguimiento',
+    estado: estadoUI,
     tipo: 'Conductual',               // ← mapear desde situaciones cuando lo tengas
     fecha: new Date(inc.fecha).toLocaleDateString('es-ES'),
     responsable: 'Sistema',
